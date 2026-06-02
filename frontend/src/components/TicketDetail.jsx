@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 const priorityColors = {
   Normal: 'bg-slate-100 text-slate-700',
@@ -6,18 +6,74 @@ const priorityColors = {
   Critical: 'bg-rose-100 text-rose-900',
 }
 
-export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClose, onAddNote }) {
+export default function TicketDetail({ ticket, supportUser, onAssign, onPriorityChange, onClose, onAddNote }) {
   const [noteText, setNoteText] = useState('')
+  const [actionInProgress, setActionInProgress] = useState(null)
+  const [successMessage, setSuccessMessage] = useState(null)
+  const isAssignedToCurrentUser = !ticket.assignedTo || ticket.assignedTo === supportUser
 
   const noteList = useMemo(() => ticket.notes || [], [ticket.notes])
 
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [successMessage])
+
+  const handleAssignClick = async () => {
+    setActionInProgress('assign')
+    try {
+      await onAssign()
+      setSuccessMessage('✓ Ticket claimed successfully!')
+    } finally {
+      setActionInProgress(null)
+    }
+  }
+
+  const handlePriorityClick = async (priority) => {
+    setActionInProgress(`priority-${priority}`)
+    try {
+      await onPriorityChange(priority)
+      setSuccessMessage(`✓ Priority changed to ${priority}!`)
+    } finally {
+      setActionInProgress(null)
+    }
+  }
+
+  const handleCloseClick = async () => {
+    setActionInProgress('close')
+    try {
+      await onClose()
+      setSuccessMessage('✓ Ticket closed successfully!')
+    } finally {
+      setActionInProgress(null)
+    }
+  }
+
+  const handleAddNoteClick = async () => {
+    setActionInProgress('note')
+    try {
+      await onAddNote(noteText)
+      setNoteText('')
+      setSuccessMessage('✓ Note added successfully!')
+    } finally {
+      setActionInProgress(null)
+    }
+  }
+
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm">
+    <div className="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-200/70 ring-1 ring-slate-200">
+      {!isAssignedToCurrentUser ? (
+        <div className="mb-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm">
+          This ticket is assigned to <strong>{ticket.assignedTo}</strong>. Only the assigned support member may edit or add notes.
+        </div>
+      ) : null}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Ticket {ticket.ticketNumber}</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">{ticket.subject}</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{ticket.originalDescription}</p>
+          <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Ticket {ticket.ticketNumber}</p>
+          <h2 className="mt-2 text-3xl font-semibold text-slate-900">{ticket.subject}</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">{ticket.originalDescription}</p>
         </div>
         <div className="space-y-3 text-right">
           <div className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${priorityColors[ticket.priority] || 'bg-slate-100 text-slate-700'}`}>
@@ -30,9 +86,9 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
 
       <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
         <div className="space-y-4">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
             <p className="text-sm font-semibold text-slate-800">Details</p>
-            <dl className="mt-3 space-y-2 text-sm text-slate-600">
+            <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
               <div className="flex items-center justify-between gap-4">
                 <dt className="font-medium">Source</dt>
                 <dd>{ticket.sourceType}</dd>
@@ -56,7 +112,7 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
             </dl>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-800">Resolution Summary</p>
             <p className="mt-3 min-h-[120px] whitespace-pre-line text-sm leading-6 text-slate-700">
               {ticket.resolutionSummary || 'No summary yet. Close the ticket to capture the final decision.'}
@@ -83,15 +139,18 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
                 value={noteText}
                 onChange={(event) => setNoteText(event.target.value)}
                 rows={4}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-500"
-                placeholder="Add a new note for this ticket"
+                disabled={!isAssignedToCurrentUser}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-500 disabled:bg-slate-50 disabled:text-slate-400"
+                placeholder={isAssignedToCurrentUser ? 'Add a new note for this ticket' : 'This ticket is assigned to another support member'}
               />
               <button
-                onClick={() => {
-                  onAddNote(noteText)
-                  setNoteText('')
-                }}
-                className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                onClick={handleAddNoteClick}
+                disabled={!isAssignedToCurrentUser || !noteText.trim()}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  !isAssignedToCurrentUser || !noteText.trim()
+                    ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                    : 'bg-slate-900 text-white hover:bg-slate-700'
+                }`}
               >
                 Save Note
               </button>
@@ -104,10 +163,11 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
             <p className="text-sm font-semibold text-slate-800">Actions</p>
             <div className="mt-4 space-y-3">
               <button
-                onClick={onAssign}
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+                onClick={handleAssignClick}
+                disabled={ticket.assignedTo && ticket.assignedTo !== supportUser}
+                className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${ticket.assignedTo ? 'bg-emerald-100 text-emerald-900 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-700'}`}
               >
-                Claim / Assign to Me
+                {ticket.assignedTo ? `Assigned to ${ticket.assignedTo}` : 'Claim / Assign to Me'}
               </button>
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-slate-700">Set priority</p>
@@ -115,10 +175,13 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
                   {['Normal', 'Important', 'Critical'].map((priority) => (
                     <button
                       key={priority}
-                      onClick={() => onPriorityChange(priority)}
+                      onClick={() => handlePriorityClick(priority)}
+                      disabled={!isAssignedToCurrentUser}
                       className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                         ticket.priority === priority
                           ? 'bg-slate-900 text-white'
+                          : !isAssignedToCurrentUser
+                          ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
                           : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                       }`}
                     >
@@ -128,8 +191,13 @@ export default function TicketDetail({ ticket, onAssign, onPriorityChange, onClo
                 </div>
               </div>
               <button
-                onClick={onClose}
-                className="w-full rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700"
+                onClick={handleCloseClick}
+                disabled={!isAssignedToCurrentUser}
+                className={`w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                  !isAssignedToCurrentUser
+                    ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                    : 'bg-rose-600 text-white hover:bg-rose-700'
+                }`}
               >
                 Close Ticket
               </button>

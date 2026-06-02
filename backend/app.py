@@ -214,6 +214,22 @@ def update_ticket(ticket_id):
     if ticket is None:
         return jsonify({"error": "Ticket not found"}), 404
 
+    # Authorization: only the assigned support user may modify a ticket once assigned.
+    actor = payload.get("actor")
+    actor_categories = payload.get("actorCategories") or []
+    current_assigned = ticket["assigned_to"]
+    # If the ticket is already assigned to someone else, reject updates from other users.
+    if current_assigned is not None and actor is not None and actor != current_assigned:
+        return jsonify({"error": "Only the assigned support user may modify this ticket."}), 403
+    # If unassigned and the payload attempts to assign to someone other than the actor, reject it.
+    requested_assigned = payload.get("assignedTo")
+    if current_assigned is None and requested_assigned is not None and actor is not None and requested_assigned != actor:
+        return jsonify({"error": "You may only assign the ticket to yourself when claiming it."}), 403
+    # If unassigned and the ticket has a category, the actor must be qualified for that category.
+    if current_assigned is None and ticket["category"] and actor is not None and actor_categories:
+        if ticket["category"] not in actor_categories:
+            return jsonify({"error": f"Not authorized for category {ticket['category']}."}), 403
+
     fields = [
         "sender_name",
         "sender_email",
@@ -275,8 +291,14 @@ def add_note(ticket_id):
     author = payload.get("author")
     if not body:
         return jsonify({"error": "Note body is required"}), 400
-    now = datetime.utcnow().isoformat()
     db = get_db()
+    ticket = db.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+    if ticket is None:
+        return jsonify({"error": "Ticket not found"}), 404
+    # If ticket is assigned, only the assigned user may add notes
+    if ticket["assigned_to"] and author and author != ticket["assigned_to"]:
+        return jsonify({"error": "Only the assigned support user may add notes to this ticket."}), 403
+    now = datetime.utcnow().isoformat()
     db.execute(
         "INSERT INTO notes (ticket_id, created_at, author, body) VALUES (?, ?, ?, ?)",
         (ticket_id, now, author, body),
@@ -291,8 +313,17 @@ def close_ticket(ticket_id):
     resolution_summary = payload.get("resolutionSummary")
     if not resolution_summary:
         return jsonify({"error": "Resolution summary is required to close a ticket"}), 400
-    now = datetime.utcnow().isoformat()
+    author = payload.get("author")
     db = get_db()
+    ticket = db.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+    if ticket is None:
+        return jsonify({"error": "Ticket not found"}), 404
+    # Must be assigned to somebody before closing, and only the assigned user may close it
+    if not ticket["assigned_to"]:
+        return jsonify({"error": "Ticket must be assigned before it can be closed."}), 403
+    if author is None or author != ticket["assigned_to"]:
+        return jsonify({"error": "Only the assigned support user may close this ticket."}), 403
+    now = datetime.utcnow().isoformat()
     db.execute(
         "UPDATE tickets SET status = ?, resolution_summary = ?, closed_at = ? WHERE id = ?",
         ("Closed", resolution_summary, now, ticket_id),

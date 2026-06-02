@@ -60,10 +60,13 @@ export default function TicketForm({ onCreate }) {
   }
 
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">New Internal Query</h2>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">A-J</span>
+    <div className="rounded-[2rem] bg-white p-6 shadow-xl shadow-slate-200/60 ring-1 ring-slate-200">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">New Internal Query</h2>
+          <p className="mt-2 text-sm text-slate-500">Submit your question and assign it to a category for faster support routing.</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Categories A–J</span>
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
@@ -71,7 +74,7 @@ export default function TicketForm({ onCreate }) {
           <input
             value={senderEmail}
             onChange={(event) => setSenderEmail(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-2 text-sm outline-none focus:border-slate-500"
+            className="mt-2 w-full rounded-[1.5rem] border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white"
             placeholder="user@company.com"
           />
         </div>
@@ -80,7 +83,7 @@ export default function TicketForm({ onCreate }) {
           <input
             value={department}
             onChange={(event) => setDepartment(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-2 text-sm outline-none focus:border-slate-500"
+            className="mt-2 w-full rounded-[1.5rem] border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white"
             placeholder="e.g. Manufacturing, Quality, Purchasing"
           />
         </div>
@@ -89,7 +92,7 @@ export default function TicketForm({ onCreate }) {
           <select
             value={category}
             onChange={(event) => setCategory(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-2 text-sm outline-none focus:border-slate-500"
+            className="mt-2 w-full rounded-[1.5rem] border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white"
           >
             {CATEGORY_OPTIONS.map((option) => (
               <option key={option} value={option}>{option}</option>
